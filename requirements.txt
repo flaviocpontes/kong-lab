@@ -1,0 +1,3 @@
+flask
+simple_json_log_formatter
+gunicorn

@@ -1,0 +1,87 @@
+networks:
+  kong-network:
+
+services:
+  gateway:
+    image: kong:2.8.3-alpine
+    platform: linux/amd64
+    restart: on-failure
+    networks:
+      - kong-network
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kongpass
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "8001:8001"
+      - "8444:8444"
+    depends_on:
+      database:
+        condition: service_healthy
+      kong-migrations:
+        condition: service_completed_successfully
+
+  kong-migrations:
+    image: kong:2.8.3-alpine
+    platform: linux/amd64
+    restart: on-failure
+    networks:
+      - kong-network
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: database
+      KONG_PG_PASSWORD: kongpass
+    command: "kong migrations bootstrap"
+    depends_on:
+      database:
+        condition: service_healthy
+
+  database:
+    image: postgres:14-alpine
+    restart: on-failure
+    networks:
+      - kong-network
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kongpass
+      POSTGRES_DB: kong
+      PGUSER: kong
+      PGPASSWORD: kongpass
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
+  simple_service:
+    image: response_service
+    build:
+      context: .
+    networks:
+      - kong-network
+
+  service_green:
+    image: response_service
+    build:
+      context: .
+    networks:
+      - kong-network
+    environment:
+      GREET: Green
+
+  service_blue:
+    image: response_service
+    build:
+      context: .
+    networks:
+      - kong-network
+    environment:
+      GREET: Blue
